@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: mongo
+  labels:
+    app: mongo
+    environment: prod
+spec:
+  serviceName: "mongo"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongo
+      environment: prod
+  template:
+    metadata:
+      labels:
+        app: mongo
+        environment: prod
+    spec:
+      serviceAccountName: "mongoautocluster"
+      containers:
+      - name: mongo
+        image: mongo
+        command:
+        - mongod
+        - "--bind_ip_all"
+        - "--replSet"
+        - rs0
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongo-persistent-storage
+          mountPath: /data/db
+        resources:
+          requests:
+            cpu: 0.1
+            memory: "128Mi"
+          limits:
+            cpu: 1
+            memory: "512Mi"
+      - name: mongo-sidecar
+        image: morphy/k8s-mongo-sidecar
+        env:
+        - name: MONGO_SIDECAR_POD_LABELS
+          value: "app=mongo,environment=prod"
+        - name: KUBERNETES_NAMESPACE
+          value: "mongo"
+  volumeClaimTemplates:
+  - metadata:
+      name: mongo-persistent-storage
+      labels:
+        app: mongo
+        environment: prod
+    spec:
+      storageClassName: "ssd"
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 5Gi
